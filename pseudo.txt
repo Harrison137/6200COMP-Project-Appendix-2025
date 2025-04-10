@@ -1,0 +1,217 @@
+Import time
+Import riposte
+Import sys
+Import AdaFruit_DHT
+import GPIO
+import board
+import json
+import smbus
+
+
+
+#Banner that displays when the program is run
+BANNER = "
+                         #                                              
+                        # #   #    # #####  ####                        
+                       #   #  #    #   #   #    #                       
+                      #     # #    #   #   #    #                       
+                      ####### #    #   #   #    #                       
+                      #     # #    #   #   #    #                       
+                      #     #  ####    #    ####                        
+                                                                        
+  #####                                                                 
+ #     # #####  ###### ###### #    # #    #  ####  #    #  ####  ###### 
+ #       #    # #      #      ##   # #    # #    # #    # #      #      
+ #  #### #    # #####  #####  # #  # ###### #    # #    #  ####  #####  
+ #     # #####  #      #      #  # # #    # #    # #    #      # #      
+ #     # #   #  #      #      #   ## #    # #    # #    # #    # #      
+  #####  #    # ###### ###### #    # #    #  ####   ####   ####  ###### 
+                                                                        
+
+You must choose a growth model before automating
+Enter the number of the command you want to execute
+List of commands: \n 1. Choose Growth model \n 2. Automate \n 99. Exit program \n
+"
+
+Greenhouse = Riposte(prompt="AutoGreenhouse:-$ ", banner = BANNER)
+#variables
+GrowthModelPicked = FALSE
+
+#BCM pin definitions
+DHT22Pin=4
+MQ135Pin=24
+HygrometerPin=23
+BH1750SDA=2
+BH1750SCL=3
+LEDGasDetect=10
+LEDSoilDetect=9
+LEDLightHigh=11
+LEDLightLow=5
+LEDHumidHigh=6
+LEDHumidLow=13
+LEDTempHigh=19
+LEDTempLow=26
+
+#Set to BCM numbering and set pins
+GPIO.setmode(GPIO.board)
+GPIO.setup(10, GPIO.OUT, initial=GPIO.LOW)
+GPIO.setup(9, GPIO.OUT, initial=GPIO.LOW)
+GPIO.setup(11, GPIO.OUT, initial=GPIO.LOW)
+GPIO.setup(5, GPIO.OUT, initial=GPIO.LOW)
+GPIO.setup(6, GPIO.OUT, initial=GPIO.LOW)
+GPIO.setup(13, GPIO.OUT, initial=GPIO.LOW)
+GPIO.setup(19, GPIO.OUT, initial=GPIO.LOW)
+GPIO.setup(26, GPIO.OUT, initial=GPIO.LOW)
+DHT22Sensor = AdaFruit_DHT.DHT22(Board.DHT22Pin)
+
+#Functions
+DEFINE DHT_READ:
+
+#Errors happen often with DHT sensors so read
+#until values have been captured
+try:
+    humidity = Sensor.ReadHumidity
+    temperature = Sensor.ReadTemperature
+    
+    If humidity < humidity_lower
+        then:
+            GPIO.output(LEDHumidLow, GPIO.HIGH)
+            
+    elseif humidity > humidity_higher
+        then:
+            GPIO.output(LEDHumidHigh, GPIO.HIGH)
+    else:
+        GPIO.output(LEDHumidHigh, GPIO.LOW)
+        GPIO.output(LEDHumidLow, GPIO.LOW)
+        
+        
+    If temperature < temperature_lower
+        then:
+            GPIO.output(LEDTempLow, GPIO.HIGH)
+            
+    elseif temperature > temperature_higher
+        then:
+            GPIO.output(LEDTempHigh, GPIO.HIGH)
+    else:
+        GPIO.output(LEDTempHigh, GPIO.LOW)
+        GPIO.output(LEDTempLow, GPIO.LOW)
+            
+except:
+    print(error.args[0])
+    time.sleep(2)
+    Continue
+
+
+
+DEFINE BH1750_READ:
+	BHDevice = 0x23
+	PowerDown = 0x00
+	PowerOn = 0x01
+	Reset = 0x07
+	bus = smbus.SMBus(1)
+
+	DEFINE convert(data):
+		result = (data[1] + (256 * data[0])) / 1.2
+		RETURN (result)
+	
+	DEFINE ReadLight(addr=BHDevice):
+		data = bus.read_i2c_block_data(addr, 0x10)
+		return convert(data)
+	DEFINE RunLight:
+		LightLevel = ReadLight()
+		print("Light level: " + format(LightLevel, '.2f') + "lx\n")
+
+	RunLight()
+
+DEFINE MQ135_READ:
+
+try:
+#MQ135 digital readings are backwards, if TRUE
+#then that means there is nothing detected
+#that takes the sensor over the set threshold
+#if FALSE then a gas is taking the sensor
+#over the threshold set by the potentiometer
+    if GPIO.input(MQ135Pin) = TRUE:
+        then:
+            GPIO.output(LEDGasDetect, GPIO.LOW)
+    else:
+        GPIO.output(LEDGasDetect, GPIO.HIGH)
+except:
+    print "An error has occured"
+
+
+DEFINE SOIL_READ:
+try:
+    if GPIO.input(HygrometerPin) = TRUE:
+        then:
+            GPIO.output(LEDSoilDetect, GPIO.HIGH)
+    else:
+        GPIO.output(LEDSoilDetect, GPIO.LOW)
+except:
+    print "An error has occured"
+
+
+
+#main commands
+@Greenhouse.command("1")
+try:
+    print "Enter the number of the growth model you wish to choose"
+    GrowthModelInput = userinput("1. Strawberry \n 2. Paprika \n 3. Tomato \n")
+    
+    Open ("models.csv", mode=r) as file:
+    reader = csv.(file)
+    
+    if GrowthModelInput = 1
+        then:
+        rowstart = 0
+    elseif GrowthModelInput = 2 
+        then:
+        rowstart = 8
+    elseif GrowthModelInput = 3
+        then:
+        rowstart = 16
+        
+    for row in reader:
+        temperature_lower=float(row[rowstart+0])
+        temperature_higher=float(row[rowstart+1])
+        humidity_lower=float(row[rowstart+2])
+        humidity_higher=float(row[rowstart+3])
+        light_lower=float(row[rowstart+4])
+        light_higher=float(row[rowstart+5])
+        soil_moisture=float(row[rowstart+6])
+    
+    GrowthModelPicked = TRUE
+except:
+    print "An error has occured"
+    sys.exit(1)
+    
+    
+    
+    
+@Greenhouse.command("2")
+try:
+    if GrowthModelPicked = TRUE
+        then:
+            While TRUE:
+                (DHT_READ)
+                (BH1750_READ)
+                (SOIL_READ)
+                (MQ135_READ)
+                time.sleep(5)
+        
+    else:
+        print "you have not yet picked a growth model. "
+except:
+    print "An error has occured"
+    GPIO.cleanup()
+    sys.exit(1)
+
+
+
+
+@Greenhouse.command("99")
+sys.exit(1)
+
+#Run the program
+Greenhouse.run()
+
