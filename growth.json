@@ -1,0 +1,29 @@
+[
+  {
+    "id": 1,
+    "Humidity_higher": 85,
+    "Humidity_lower": 75,
+    "Light_higher": 54000,
+    "Light_lower": 43200,
+    "Temperature_higher": 25,
+    "Temperature_lower": 21
+  },
+  {
+    "id": 2,
+    "Humidity_higher": 85,
+    "Humidity_lower": 75,
+    "Light_higher": 50000,
+    "Light_lower": 41000,
+    "Temperature_higher": 23,
+    "Temperature_lower": 19
+  },
+  {
+    "id": 3,
+    "Humidity_higher": 90,
+    "Humidity_lower": 80,
+    "Light_higher": 54000,
+    "Light_lower": 43200,
+    "Temperature_higher": 28,
+    "Temperature_lower": 22
+  }
+]
